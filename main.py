@@ -55,6 +55,7 @@ import numpy as np
 import pyautogui
 import pydirectinput
 import requests
+import tkinter as tk
 from pynput import keyboard
 from PIL import Image, ImageGrab
 import win32gui
@@ -89,7 +90,12 @@ LOG_FILE = os.path.join(APP_DIR, "bot_log.txt")
 CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
-CURRENT_VERSION = "1.1.6"
+CURRENT_VERSION = "1.2.0"
+APP_DISPLAY_NAME = "FH6Auto Fork"
+APP_ATTRIBUTION = "Based on YOUSTHEONE/FH6Auto"
+UPSTREAM_REPO_URL = "https://github.com/YOUSTHEONE/FH6Auto"
+PROJECT_REPO_URL = "https://github.com/CaiSF25/FH6Auto-Fork"
+UPDATE_MANIFEST_URL = "https://raw.githubusercontent.com/CaiSF25/FH6Auto-Fork/refs/heads/main/version.json"
 def auto_extract_configs():
     os.makedirs(CONFIG_DIR, exist_ok=True)
     
@@ -322,7 +328,7 @@ class FH_UltimateBot(ctk.CTk):
     def __init__(self):
         super().__init__()
         #窗口相关
-        self.title(f"FH6Auto by YSTO v{CURRENT_VERSION}")
+        self.title(f"{APP_DISPLAY_NAME} v{CURRENT_VERSION}")
         self.geometry("1800x800")
         #self.minsize(980, 560)
         self.attributes("-topmost", False)
@@ -345,6 +351,7 @@ class FH_UltimateBot(ctk.CTk):
         self.cj_counter = 0
         self.sc_count = 0
         self.global_loop_current = 0
+        self.memory_car_page = 0
 
         self.template_cache = {}
         self.scaled_template_cache = {}
@@ -405,6 +412,8 @@ class FH_UltimateBot(ctk.CTk):
             val = "".join(c for c in self.entry_car.get() if c.isdigit())
             if val == "":
                 val = "0"
+            self.entry_cj.delete(0, "end")
+            self.entry_cj.insert(0, val)
             self.entry_sc.delete(0, "end")
             self.entry_sc.insert(0, val)
         except Exception:
@@ -425,6 +434,13 @@ class FH_UltimateBot(ctk.CTk):
         except Exception:
             entry_widget.delete(0, "end")
             entry_widget.insert(0, str(default_value))
+
+    def should_reset_cj_memory_on_new_loop(self):
+        try:
+            next_after_cj = int(self.entry_next3.get())
+        except Exception:
+            next_after_cj = int(self.config.get("next_3", 4))
+        return next_after_cj == 4
     # ==========================================
     # --- 初始化全局 Region ---
     # ==========================================
@@ -462,11 +478,11 @@ class FH_UltimateBot(ctk.CTk):
             "chk_4": True,
             "next_1": 2, 
             "next_2": 3, 
-            "next_3": 1, 
+            "next_3": 4, 
             "next_4": 1,
             "global_loops": 10, 
             "skill_dirs": ["right", "up", "up", "up", "left"],
-            "share_code": "890169683", 
+            "share_code": "179383666",
             "auto_restart": False,
             "restart_cmd": "start steam://run/2483190", 
             "sell_mode": 1 
@@ -693,6 +709,28 @@ class FH_UltimateBot(ctk.CTk):
         self.entry_share = ctk.CTkEntry(box_race, width=130, justify="center", placeholder_text="蓝图数字代码")
         self.entry_share.insert(0, self.config.get("share_code", "890169683"))
         self.entry_share.pack(pady=4)
+        self.btn_replace_skillcar = ctk.CTkButton(
+            box_race,
+            text="替换跑图车图",
+            width=130,
+            height=30,
+            corner_radius=8,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            command=self.capture_skillcar_template
+        )
+        self.btn_replace_skillcar.pack(pady=(2, 4))
+        self.btn_replace_brand = ctk.CTkButton(
+            box_race,
+            text="替换品牌图",
+            width=130,
+            height=30,
+            corner_radius=8,
+            fg_color="#0F766E",
+            hover_color="#115E59",
+            command=self.capture_ccbrand_template
+        )
+        self.btn_replace_brand.pack(pady=(0, 4))
 
         self.next_frame1, self.entry_next1, self.chk1 = create_next_step(
             self.config_frame, self.var_chk1, self.config.get("next_1", 2)
@@ -965,7 +1003,7 @@ class FH_UltimateBot(ctk.CTk):
         self.btn_mini_pause = ctk.CTkButton(self.mini_frame, text="⏸ 暂停 (F9)", fg_color="#F1C40F", hover_color="#D4AC0D", width=90, font=ctk.CTkFont(weight="bold"), command=self.toggle_pause)
         self.btn_mini_pause.pack(side="left", fill="y", padx=5, pady=10)
 
-        self.btn_mini_support = ctk.CTkButton(self.mini_frame, text="❤ 支持", fg_color="#F97316", hover_color="#EA580C", width=60, font=ctk.CTkFont(weight="bold"), command=self.open_support_window)
+        self.btn_mini_support = ctk.CTkButton(self.mini_frame, text="关于", fg_color="#F97316", hover_color="#EA580C", width=60, font=ctk.CTkFont(weight="bold"), command=self.open_support_window)
         self.btn_mini_support.pack(side="left", fill="y", padx=(5, 10), pady=10)
 
 
@@ -997,7 +1035,7 @@ class FH_UltimateBot(ctk.CTk):
 
         self.btn_support = ctk.CTkButton(
             self,
-            text="❤ 支持作者 / 检查更新",
+            text="关于此版本 / 检查更新",
             fg_color="#F97316",
             hover_color="#EA580C",
             height=42,
@@ -1016,8 +1054,8 @@ class FH_UltimateBot(ctk.CTk):
             return
 
         self.support_win = ctk.CTkToplevel(self)
-        self.support_win.title("感谢支持 & 更新")
-        self.support_win.geometry("340x520")
+        self.support_win.title("关于此版本")
+        self.support_win.geometry("380x420")
         self.support_win.attributes("-topmost", True)
         self.support_win.resizable(False, False)
 
@@ -1029,43 +1067,36 @@ class FH_UltimateBot(ctk.CTk):
             pass
 
         self.support_win.update_idletasks()
-        x = self.winfo_x() + (self.winfo_width() - 340) // 2
-        y = self.winfo_y() + (self.winfo_height() - 520) // 2
+        x = self.winfo_x() + (self.winfo_width() - 380) // 2
+        y = self.winfo_y() + (self.winfo_height() - 420) // 2
         self.support_win.geometry(f"+{x}+{y}")
 
         ctk.CTkLabel(
             self.support_win,
-            text="感谢您的支持与鼓励",
+            text=APP_DISPLAY_NAME,
             font=ctk.CTkFont(weight="bold", size=18),
             text_color="#F97316",
         ).pack(pady=(20, 6))
 
         ctk.CTkLabel(
             self.support_win,
-            text="您的支持是我持续优化的动力！",
-            font=ctk.CTkFont(size=12),
+            text=f"v{CURRENT_VERSION}",
+            font=ctk.CTkFont(size=13, weight="bold"),
         ).pack(pady=4)
 
-        qr_path = get_asset_path("qrcode.png")
-        try:
-            if qr_path and os.path.exists(qr_path):
-                img = Image.open(qr_path)
-                qr_img = ctk.CTkImage(light_image=img, size=(210, 210))
-                qr_label = ctk.CTkLabel(self.support_win, text="", image=qr_img)
-                qr_label.image = qr_img
-                qr_label.pack(pady=10)
-            else:
-                ctk.CTkLabel(self.support_win, text="（未找到内置 qrcode.png）", text_color="gray").pack(pady=40)
-        except Exception:
-            ctk.CTkLabel(self.support_win, text="（二维码加载失败）", text_color="gray").pack(pady=40)
-
-        ctk.CTkButton(
+        ctk.CTkLabel(
             self.support_win,
-            text="前往 爱发电 赞助主页",
-            fg_color="#8E44AD",
-            hover_color="#7D3C98",
-            command=lambda: webbrowser.open("https://ifdian.net/a/yousto"),
-        ).pack(pady=5)
+            text=APP_ATTRIBUTION,
+            text_color="#A0A0A0",
+            font=ctk.CTkFont(size=12),
+        ).pack(pady=(2, 10))
+
+        about_box = ctk.CTkTextbox(self.support_win, height=120, width=320, corner_radius=10)
+        about_box.pack(padx=20, pady=8, fill="x")
+        about_box.insert("end", "这是一个基于上游项目修改的 fork 版本。\n\n")
+        about_box.insert("end", "当前界面标题、流程逻辑和模板替换功能已按本地修改版本调整。\n")
+        about_box.insert("end", "发布到你自己的 GitHub 时，建议同时保留对上游项目的引用说明。")
+        about_box.configure(state="disabled")
 
         ctk.CTkFrame(self.support_win, height=2, fg_color="#333333").pack(fill="x", padx=20, pady=10)
 
@@ -1080,7 +1111,7 @@ class FH_UltimateBot(ctk.CTk):
         def check_update_logic():
             self.ui_call(self.lbl_version.configure, text="正在连接 Github...", text_color="#3498DB")
             try:
-                url = "https://raw.githubusercontent.com/YOUSTHEONE/FH6Auto/refs/heads/main/version.json"
+                url = UPDATE_MANIFEST_URL
                 resp = requests.get(url, timeout=5)
                 if resp.status_code == 200:
                     data = resp.json()
@@ -1088,7 +1119,7 @@ class FH_UltimateBot(ctk.CTk):
                     remote_url = data.get("url", "")
 
                     if parse_version(remote_ver) > parse_version(CURRENT_VERSION):
-                        if remote_url.startswith("https://github.com/YOUSTHEONE/") or remote_url.startswith("https://ifdian.net/"):
+                        if remote_url.startswith("https://github.com/"):
                             self.ui_call(
                                 self.lbl_version.configure,
                                 text=f"发现新版本 v{remote_ver}，已打开浏览器！",
@@ -1135,12 +1166,22 @@ class FH_UltimateBot(ctk.CTk):
 
         ctk.CTkButton(
             btn_frame,
-            text="GitHub",
+            text="当前项目",
             width=100,
             height=30,
             fg_color="#2EA043",
             hover_color="#238636",
-            command=lambda: webbrowser.open("https://github.com/YOUSTHEONE/FH6Auto"),
+            command=lambda: webbrowser.open(PROJECT_REPO_URL),
+        ).pack(side="left", padx=5)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="上游项目",
+            width=100,
+            height=30,
+            fg_color="#2563EB",
+            hover_color="#1D4ED8",
+            command=lambda: webbrowser.open(UPSTREAM_REPO_URL),
         ).pack(side="left", padx=5)
     def update_timer(self):
         if not self.is_running:
@@ -1317,6 +1358,247 @@ class FH_UltimateBot(ctk.CTk):
             except Exception:
                 pass
         self.ui_call(write_ui)
+
+    def refresh_template_cache_for(self, template_name):
+        actual_path = get_img_path(template_name)
+
+        self.template_cache.pop(actual_path, None)
+        if hasattr(self, "template_gray_cache"):
+            self.template_gray_cache.pop(("gray", actual_path), None)
+
+        stale_scaled_keys = [k for k in self.scaled_template_cache.keys() if k[0] == actual_path]
+        for key in stale_scaled_keys:
+            self.scaled_template_cache.pop(key, None)
+
+        if hasattr(self, "scaled_edge_template_cache"):
+            stale_edge_keys = [k for k in self.scaled_edge_template_cache.keys() if k[0] == actual_path]
+            for key in stale_edge_keys:
+                self.scaled_edge_template_cache.pop(key, None)
+
+        if hasattr(self, "edge_template_cache"):
+            self.edge_template_cache.pop(actual_path, None)
+
+        self.file_template_cache = {}
+
+        try:
+            if os.path.exists(TEMPLATE_CACHE_FILE):
+                os.remove(TEMPLATE_CACHE_FILE)
+            if os.path.exists(TEMPLATE_META_FILE):
+                os.remove(TEMPLATE_META_FILE)
+        except Exception:
+            pass
+
+    def capture_skillcar_template(self):
+        self.start_template_capture("skillcar.png", "跑图车辆图")
+
+    def capture_ccbrand_template(self):
+        self.start_template_capture("CCbrand.png", "品牌图")
+
+    def start_template_capture(self, template_name, display_name):
+        if self.is_running:
+            self.log(f"请先停止当前任务，再替换{display_name}。")
+            return
+
+        self.log(f"准备替换{display_name}：将自动切回游戏，并开启框选截图。")
+        if not self.check_and_focus_game():
+            self.log("未检测到游戏窗口，无法开始框选截图。")
+            return
+
+        self.after(250, lambda: self.begin_template_capture_overlay(template_name, display_name))
+
+    def begin_template_capture_overlay(self, template_name, display_name):
+        try:
+            self.attributes("-topmost", False)
+            self.withdraw()
+            self.update_idletasks()
+        except Exception:
+            pass
+
+        vx = ctypes.windll.user32.GetSystemMetrics(76)
+        vy = ctypes.windll.user32.GetSystemMetrics(77)
+        vw = ctypes.windll.user32.GetSystemMetrics(78)
+        vh = ctypes.windll.user32.GetSystemMetrics(79)
+
+        overlay = tk.Toplevel(self)
+        overlay.title("截取跑图车辆图片")
+        overlay.overrideredirect(True)
+        overlay.attributes("-topmost", True)
+        overlay.attributes("-alpha", 0.28)
+        overlay.configure(bg="black")
+        overlay.geometry(f"{vw}x{vh}+{vx}+{vy}")
+
+        canvas = tk.Canvas(overlay, bg="black", highlightthickness=0, cursor="crosshair")
+        canvas.pack(fill="both", expand=True)
+
+        hint_text = canvas.create_text(
+            40,
+            30,
+            anchor="w",
+            text=f"按住左键框选{display_name}区域，松开后预览确认；右键或 Esc 取消。",
+            fill="white",
+            font=("Microsoft YaHei UI", 13, "bold")
+        )
+
+        state = {"start_x": None, "start_y": None, "rect": None}
+
+        def cleanup(show_main=True):
+            try:
+                overlay.destroy()
+            except Exception:
+                pass
+
+            if show_main:
+                try:
+                    self.deiconify()
+                    self.lift()
+                    self.attributes("-topmost", False)
+                    self.center_window()
+                except Exception:
+                    pass
+
+        def cancel_capture(event=None):
+            self.log("已取消跑图车辆图片替换。")
+            cleanup(show_main=True)
+
+        def on_press(event):
+            state["start_x"] = event.x_root
+            state["start_y"] = event.y_root
+            if state["rect"] is not None:
+                canvas.delete(state["rect"])
+            state["rect"] = canvas.create_rectangle(
+                event.x_root - vx,
+                event.y_root - vy,
+                event.x_root - vx,
+                event.y_root - vy,
+                outline="#4ADE80",
+                width=2
+            )
+
+        def on_drag(event):
+            if state["rect"] is None:
+                return
+            canvas.coords(
+                state["rect"],
+                state["start_x"] - vx,
+                state["start_y"] - vy,
+                event.x_root - vx,
+                event.y_root - vy
+            )
+
+        def on_release(event):
+            if state["start_x"] is None or state["start_y"] is None:
+                cancel_capture()
+                return
+
+            x1 = min(state["start_x"], event.x_root)
+            y1 = min(state["start_y"], event.y_root)
+            x2 = max(state["start_x"], event.x_root)
+            y2 = max(state["start_y"], event.y_root)
+
+            if x2 - x1 < 20 or y2 - y1 < 20:
+                self.log("截图区域过小，已取消本次替换。")
+                cleanup(show_main=True)
+                return
+
+            try:
+                img = ImageGrab.grab(bbox=(int(x1), int(y1), int(x2), int(y2)), all_screens=True)
+                cleanup(show_main=True)
+                self.show_template_preview_dialog(template_name, display_name, img)
+            except Exception as e:
+                self.log(f"截取{display_name}失败: {e}")
+                cleanup(show_main=True)
+
+        overlay.bind("<Escape>", cancel_capture)
+        overlay.bind("<Button-3>", cancel_capture)
+        canvas.bind("<ButtonPress-1>", on_press)
+        canvas.bind("<B1-Motion>", on_drag)
+        canvas.bind("<ButtonRelease-1>", on_release)
+
+        overlay.focus_force()
+
+    def show_template_preview_dialog(self, template_name, display_name, image):
+        preview_win = ctk.CTkToplevel(self)
+        preview_win.title(f"确认替换{display_name}")
+        preview_win.geometry("420x420")
+        preview_win.attributes("-topmost", True)
+        preview_win.resizable(False, False)
+
+        try:
+            icon_path = get_asset_path("icon.ico")
+            if icon_path:
+                preview_win.iconbitmap(icon_path)
+        except Exception:
+            pass
+
+        ctk.CTkLabel(
+            preview_win,
+            text=f"预览{display_name}",
+            font=ctk.CTkFont(size=18, weight="bold")
+        ).pack(pady=(16, 8))
+
+        preview_size = (320, 220)
+        try:
+            preview_img = image.copy()
+            preview_img.thumbnail(preview_size)
+            ctk_img = ctk.CTkImage(light_image=preview_img, size=preview_img.size)
+            lbl_preview = ctk.CTkLabel(preview_win, text="", image=ctk_img)
+            lbl_preview.image = ctk_img
+            lbl_preview.pack(pady=8)
+        except Exception:
+            ctk.CTkLabel(preview_win, text="预览加载失败，但仍可选择保存。", text_color="gray").pack(pady=18)
+
+        ctk.CTkLabel(
+            preview_win,
+            text=f"将覆盖 images/{template_name}",
+            text_color="#A0A0A0"
+        ).pack(pady=(4, 12))
+
+        btn_frame = ctk.CTkFrame(preview_win, fg_color="transparent")
+        btn_frame.pack(pady=10)
+
+        def save_capture():
+            try:
+                save_path = os.path.join(APP_DIR, "images", template_name)
+                os.makedirs(os.path.dirname(save_path), exist_ok=True)
+                image.save(save_path)
+                self.refresh_template_cache_for(template_name)
+                threading.Thread(target=self.prepare_template_cache, daemon=True).start()
+                self.log(f"{display_name}已更新: {save_path}")
+            except Exception as e:
+                self.log(f"保存{display_name}失败: {e}")
+            finally:
+                try:
+                    preview_win.destroy()
+                except Exception:
+                    pass
+
+        def cancel_preview():
+            self.log(f"已取消替换{display_name}。")
+            try:
+                preview_win.destroy()
+            except Exception:
+                pass
+
+        ctk.CTkButton(
+            btn_frame,
+            text="保存替换",
+            width=120,
+            fg_color="#16A34A",
+            hover_color="#15803D",
+            command=save_capture
+        ).pack(side="left", padx=8)
+
+        ctk.CTkButton(
+            btn_frame,
+            text="取消",
+            width=120,
+            fg_color="#4B5563",
+            hover_color="#374151",
+            command=cancel_preview
+        ).pack(side="left", padx=8)
+
+        preview_win.focus_force()
+
     def start_pipeline(self, start_step):
         if self.is_running:
             return
@@ -1471,6 +1753,12 @@ class FH_UltimateBot(ctk.CTk):
                     self.car_counter = 0
                     self.cj_counter = 0
                     self.sc_count = 0
+
+                    if self.should_reset_cj_memory_on_new_loop():
+                        self.memory_car_page = 0
+                        self.log("已进入新一轮大循环，且超级抽奖下一步为删车，翻页记忆已清空。")
+                    else:
+                        self.log("已进入新一轮大循环，超级抽奖未接删车，保留翻页记忆继续搜索。")
                 
                 curr_idx = next_idx
 
@@ -3100,6 +3388,68 @@ class FH_UltimateBot(ctk.CTk):
 
         return None
 
+    def wait_for_region_stable(self, region=None, timeout=2.0, interval=0.15, diff_threshold=1.5, stable_hits=2):
+        """
+        Wait until a region stops visibly changing.
+        Used after horizontal paging so matching starts only after the
+        car list animation settles down.
+        """
+        start = time.time()
+        prev_gray = None
+        stable_count = 0
+
+        while self.is_running and time.time() - start < timeout:
+            try:
+                screen_bgr = self.capture_region(region)
+                curr_gray = cv2.cvtColor(screen_bgr, cv2.COLOR_BGR2GRAY)
+            except Exception:
+                time.sleep(interval)
+                continue
+
+            if prev_gray is not None and prev_gray.shape == curr_gray.shape:
+                diff = cv2.absdiff(prev_gray, curr_gray)
+                mean_diff = float(np.mean(diff))
+
+                if mean_diff <= diff_threshold:
+                    stable_count += 1
+                    if stable_count >= stable_hits:
+                        return True
+                else:
+                    stable_count = 0
+
+            prev_gray = curr_gray
+
+            sleep_end = time.time() + interval
+            while self.is_running and time.time() < sleep_end:
+                time.sleep(0.05)
+
+        return False
+
+    def fast_advance_car_pages(self, page_count, region=None):
+        """
+        Fast-forward to the remembered page with lighter waits than the
+        normal page-by-page search loop. We only use this for skipping
+        pages already confirmed empty in the same big loop.
+        """
+        for idx in range(page_count):
+            if not self.is_running:
+                return False
+
+            self.hw_press("right", delay=0.06)
+            time.sleep(0.18)
+
+            # Only do a short settle every few pages (and on the final hop)
+            if ((idx + 1) % 4 == 0) or (idx == page_count - 1):
+                self.wait_for_region_stable(
+                    region=region,
+                    timeout=1.0,
+                    interval=0.10,
+                    diff_threshold=1.8,
+                    stable_hits=1
+                )
+
+        return True
+
     def match_template_score(self, src, tpl):
         try:
             if tpl is None or src is None:
@@ -3632,50 +3982,67 @@ class FH_UltimateBot(ctk.CTk):
 
             self.game_click(brand_pos)
             time.sleep(1.0)
-            jump_pages = max(0, self.memory_car_page - 1)
-            
-            if jump_pages > 0:
-                self.log(f"智能记忆触发：快速跳过前 {jump_pages} 页...")
-                for _ in range(jump_pages):
-                    if not self.is_running: return False
-                    for _ in range(4):
-                        self.hw_press("right", delay=0.06)
-                        time.sleep(0.1)
-                    time.sleep(0.15) # 给一点点动画缓冲时间
             pos_target = None
             found_car = False
-            current_page = jump_pages # 记录当前所在的真实页码
-            
-            # 最大翻页次数扣除已经跳过的页数
-            for _ in range(85 - jump_pages):
+            start_page = max(0, min(84, int(getattr(self, "memory_car_page", 0))))
+
+            if start_page > 0:
+                self.log(f"沿用本轮记忆：直接从第 {start_page + 1} 页开始找车...")
+                if not self.fast_advance_car_pages(start_page, region=self.regions["全界面"]):
+                    return False
+
+            # 一页一停、一页一判，确认当前可见页没有目标车后再翻到下一页。
+            for page_idx in range(start_page, 85):
                 if not self.is_running:
                     return False
-                pos_target = self.wait_for_image_with_element_multi(
-                    "newCC.png",
-                    "newcartag.png",
-                    region=self.regions["全界面"],
-                    main_threshold=0.75,   # 防HDR核心：第一道门槛放低
-                    like_threshold=0.75,
-                    final_threshold=0.70,
-                    timeout=1.5,
-                    interval=0.2,
-                    fast_mode=True
-                )
-                
-                if pos_target:
-                    self.game_click(pos_target)
-                    found_car = True
-                    # 记住这次找到车是在哪一页
-                    self.memory_car_page = current_page 
-                    self.log(f"锁定目标车辆！已记录当前页码: {current_page}")
+
+                if page_idx > start_page:
+                    self.log(f"第 {page_idx + 1} 页搜索前，等待翻页动画稳定...")
+                    self.wait_for_region_stable(
+                        region=self.regions["全界面"],
+                        timeout=2.0,
+                        interval=0.15,
+                        diff_threshold=1.5,
+                        stable_hits=2
+                    )
+
+                for confirm_idx in range(2):
+                    if not self.is_running:
+                        return False
+
+                    pos_target = self.wait_for_image_with_element_multi(
+                        "newCC.png",
+                        "newcartag.png",
+                        region=self.regions["全界面"],
+                        main_threshold=0.75,   # 防HDR核心：第一道门槛放低
+                        like_threshold=0.75,
+                        final_threshold=0.70,
+                        timeout=1.0,
+                        interval=0.2,
+                        fast_mode=True
+                    )
+
+                    if pos_target:
+                        self.game_click(pos_target)
+                        found_car = True
+                        self.memory_car_page = page_idx
+                        self.log(f"锁定目标车辆！当前可见页: {page_idx + 1}")
+                        break
+
+                    if confirm_idx < 1:
+                        self.log(f"第 {page_idx + 1} 页第 {confirm_idx + 1} 次识别未命中，继续复查当前页...")
+                        time.sleep(0.25)
+
+                if found_car:
                     break
-                    
-                # 翻下一页
-                for _ in range(4):
-                    self.hw_press("right", delay=0.06)
-                    time.sleep(0.1)
-                time.sleep(0.4)
-                current_page += 1
+
+                if page_idx >= 84:
+                    break
+
+                self.log(f"第 {page_idx + 1} 页确认无目标车，翻到下一页继续搜索...")
+                self.hw_press("right", delay=0.08)
+                time.sleep(0.35)
+
             if not found_car:
                 self.log("列表中未找到目标车辆，重置记忆页码。")
                 self.memory_car_page = 0 # 没找到说明车刷完了，清零记忆
