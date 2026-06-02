@@ -3560,6 +3560,46 @@ class FH_UltimateBot(ctk.CTk):
 
         return None
 
+    def apply_race_favorites_filter(self):
+        """
+        In My Cars, open the Y filter menu and enable the first option:
+        Favorites. This narrows the race-car search space a lot.
+        """
+        self.log("进入我的车辆后，先按 Y 筛选【收藏】车辆...")
+        self.hw_press("y")
+        self.sleep_ui(0.8)
+        self.hw_press("enter")
+        self.sleep_ui(0.8)
+        self.hw_press("esc")
+        self.sleep_ui(1.0)
+
+    def find_race_skillcar_in_favorites(self, page_idx):
+        """
+        Search the current Favorites page for the race car.
+        In Favorites we prioritize speed first: try the car template directly,
+        then fall back to the stricter car+liketag check if needed.
+        """
+        if not self.is_running:
+            return None
+
+        direct_checks = 2 if page_idx == 0 else 1
+        for check_idx in range(direct_checks):
+            pos_target = self.find_image(
+                "skillcar.png",
+                region=self.regions["全界面"],
+                threshold=0.74,
+                fast_mode=True
+            )
+            if pos_target:
+                return pos_target
+            if check_idx < direct_checks - 1:
+                time.sleep(0.15)
+
+        return self.find_race_skillcar_with_recheck(
+            check_times=1,
+            settle_delay=0.12
+        )
+
     def match_template_score(self, src, tpl):
         try:
             if tpl is None or src is None:
@@ -3664,8 +3704,18 @@ class FH_UltimateBot(ctk.CTk):
         self.hw_press("enter")
         time.sleep(2.0)
 
-        self.log("进入我的车辆后，先在当前页多次确认目标跑图车...")
-        pos_target = self.find_race_skillcar_with_recheck(check_times=3, settle_delay=0.22)
+        self.apply_race_favorites_filter()
+        pos_target = self.wait_for_image_with_element_multi(
+            "skillcar.png",
+            "liketag.png",
+            region=self.regions["全界面"],
+            fast_mode=True,
+            main_threshold=0.75,
+            like_threshold=0.7,
+            final_threshold=0.7,
+            timeout=2,
+            interval=0.25
+        )
 
         if not pos_target:
             self.log("未找到带 liketag 的目标车辆，重新选品牌...")
@@ -3691,16 +3741,24 @@ class FH_UltimateBot(ctk.CTk):
                 self.log("三次尝试未找到刷图车辆品牌。")
                 return False
 
-            for page_idx in range(20):
+            for _ in range(20):
                 if not self.is_running:
                     return False
 
-                check_times = 3 if page_idx == 0 else 2
-                pos_target = self.find_race_skillcar_with_recheck(check_times=check_times, settle_delay=0.18)
+                pos_target = self.wait_for_image_with_element_multi(
+                    "skillcar.png",
+                    "liketag.png",
+                    region=self.regions["全界面"],
+                    main_threshold=0.75,
+                    like_threshold=0.7,
+                    final_threshold=0.7,
+                    timeout=2,
+                    interval=0.25,
+                    fast_mode=True
+                )
                 if pos_target:
                     break
 
-                self.log(f"当前车辆第 {page_idx + 1} 页未找到目标车，翻到下一页继续检查...")
                 for _ in range(4):
                     self.hw_press("right", delay=0.08)
                     time.sleep(0.08)
