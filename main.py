@@ -92,7 +92,7 @@ CACHE_DIR = os.path.join(APP_DIR, "cache")
 TEMPLATE_CACHE_FILE = os.path.join(CACHE_DIR, "template_cache.pkl")
 TEMPLATE_META_FILE = os.path.join(CACHE_DIR, "template_meta.json")
 LOCAL_VERSION_FILE = os.path.join(APP_DIR, "version.json")
-DEFAULT_CURRENT_VERSION = "1.2.1"
+DEFAULT_CURRENT_VERSION = "1.2.2"
 APP_DISPLAY_NAME = "FH6Auto Fork"
 APP_ATTRIBUTION = "Based on YOUSTHEONE/FH6Auto"
 DEFAULT_UPSTREAM_REPO_URL = "https://github.com/YOUSTHEONE/FH6Auto"
@@ -4024,35 +4024,77 @@ class FH_UltimateBot(ctk.CTk):
 
         self.hw_press("backspace")
         time.sleep(0.5)
+        self.wait_for_region_stable(
+            region=self.regions["全界面"],
+            timeout=1.8,
+            interval=0.12,
+            diff_threshold=2.0,
+            stable_hits=2
+        )
+        self.hw_press("up")
+        time.sleep(0.5)
+        self.wait_for_region_stable(
+            region=self.regions["全界面"],
+            timeout=1.2,
+            interval=0.10,
+            diff_threshold=2.0,
+            stable_hits=2
+        )
 
         brand_pos = None
-        for _ in range(5):
-            if not self.is_running:
-                return False
-                
-
-            brand_pos = self.wait_for_any_image_gray(
-                ["CCbrand.png"],
-                region=self.regions["全界面"],
-                threshold=0.75,
-                timeout=0.8,
-                interval=0.2,
-                fast_mode=True
-            )
-            if brand_pos:
-                break
-
-            self.hw_press("up")
-            time.sleep(0.25)
-
-        if not brand_pos:
-            self.log("未找到品牌")
+        if not self.is_running:
             return False
 
-        self.game_click(brand_pos)
-        time.sleep(0.8)
+        brand_pos = self.wait_for_any_image_gray(
+            ["CCbrand.png"],
+            region=self.regions["全界面"],
+            threshold=0.75,
+            timeout=0.8,
+            interval=0.2,
+            fast_mode=True
+        )
+
+        if brand_pos:
+            self.game_click(brand_pos)
+            time.sleep(0.9)
+        else:
+            self.log("未识别到斯巴鲁模板，改用固定按键兜底：2次UP + 3次RIGHT")
+            self.wait_for_region_stable(
+                region=self.regions["全界面"],
+                timeout=1.2,
+                interval=0.10,
+                diff_threshold=2.0,
+                stable_hits=2
+            )
+            for _ in range(2):
+                if not self.is_running:
+                    return False
+                self.hw_press("up")
+                time.sleep(0.5)
+                self.wait_for_region_stable(
+                    region=self.regions["全界面"],
+                    timeout=1.0,
+                    interval=0.10,
+                    diff_threshold=2.0,
+                    stable_hits=2
+                )
+            for _ in range(3):
+                if not self.is_running:
+                    return False
+                self.hw_press("right")
+                time.sleep(0.5)
+                self.wait_for_region_stable(
+                    region=self.regions["全界面"],
+                    timeout=1.0,
+                    interval=0.10,
+                    diff_threshold=2.0,
+                    stable_hits=2
+                )
+            self.hw_press("enter")
+            time.sleep(0.9)
+
         self.hw_press("down")
-        time.sleep(0.4)
+        time.sleep(0.5)
 
         pos_22b = self.wait_for_image(
             "consumablecar.png",
